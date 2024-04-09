@@ -122,4 +122,4 @@ while True:
         break
 
 cap.release()
-#board.exit()
+board.exit()
