@@ -1,22 +1,29 @@
 from cvzone.FaceDetectionModule import FaceDetector
 from pyfirmata import Arduino, SERVO, PWM, OUTPUT
+from motorController import Motor, motor_pins
 
 import cv2
 import cvzone
 import math
 import time
 
-#board = Arduino('COM5')
-#LED_1 = board.get_pin('d:13:o')
-#LED_2 = board.get_pin('d:12:o')
-#LED_3 = board.get_pin('d:11:o')
-
+# OpenCV Settings
 cap = cv2.VideoCapture(1)
 
 cap.set(cv2.CAP_PROP_FPS, 20)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
+detector = FaceDetector(minDetectionCon=0.3, modelSelection=0)
+
+# Board / Motor
+board = Arduino('COM5')
+
+motors = {}
+for motor_name, pins in motor_pins.items():
+    motors[motor_name] = Motor(board, pins['ena'], pins['in1'], pins['in2'])
+
+# Pixel Values Settings
 pTime = 0
 
 TURN_MIN_VALUE = 80
@@ -28,7 +35,6 @@ DISTANCE_PWN_RANGE = 180
 
 PWM_SCALE = [0.50, 1.00]
 
-detector = FaceDetector(minDetectionCon=0.3, modelSelection=0)
 
 def RangeCalc(In, in_max, in_min, out_max, out_min):
     # mapped_value = (x_clipped - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
@@ -38,7 +44,6 @@ def RangeCalc(In, in_max, in_min, out_max, out_min):
 
     mapped_value = round(mapped_value, 2)
     return mapped_value
-
 
 
 while True:
@@ -74,14 +79,14 @@ while True:
         cv2.putText(img, f"Turn Offset Value :  {turn_direc}", (20, 80), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
     
-        if distance_scale < DISTANCE_ERROR_RANGE[0]: # SERVO TURNING / DISTANCE = FAR
+        if distance_scale < DISTANCE_ERROR_RANGE[0]: # DISTANCE = FAR
 
             cv2.putText(img, "Action : Far", (20, 200), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
             pwm = RangeCalc(distance_scale, DISTANCE_ERROR_RANGE[0], DISTANCE_ERROR_RANGE[0] - DISTANCE_PWN_RANGE, PWM_SCALE[0], PWM_SCALE[1])
             cv2.putText(img, f"PWM :  {pwm}", (20, 220), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
 
-        elif distance_scale > DISTANCE_ERROR_RANGE[1]: # SERVO TURNING / DISTANCE = NEAR
+        elif distance_scale > DISTANCE_ERROR_RANGE[1]: # DISTANCE = NEAR
 
             cv2.putText(img, "Action : Near", (20, 200), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
