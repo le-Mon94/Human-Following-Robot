@@ -1,14 +1,30 @@
 from cvzone.FaceDetectionModule import FaceDetector
 from pyfirmata import Arduino, SERVO, PWM, OUTPUT
-from motorController import Motor, motor_pins
 
 import cv2
 import cvzone
 import math
 import time
 
-# OpenCV Settings
+class Motor:
+    def __init__(self, board, ena_pin, in1_pin, in2_pin):
+        self.ena = board.get_pin(f'd:{ena_pin}:p')
+        self.in1 = board.get_pin(f'd:{in1_pin}:o')
+        self.in2 = board.get_pin(f'd:{in2_pin}:o')
+        
+    def forward(self, speed):
+        self.in1.write(1)
+        self.in2.write(0)
+        self.ena.write(speed)
+        
+    def backward(self, speed):
+        self.in1.write(0)
+        self.in2.write(1)
+        self.ena.write(speed)
+
+# OpenCV / Board Settings
 cap = cv2.VideoCapture(1)
+board = Arduino('COM5')
 
 cap.set(cv2.CAP_PROP_FPS, 20)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -16,12 +32,21 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
 detector = FaceDetector(minDetectionCon=0.3, modelSelection=0)
 
-# Board / Motor
-board = Arduino('COM5')
+motor1_ena = 3
+motor1_in1 = 2
+motor1_in2 = 4
 
-motors = {}
-for motor_name, pins in motor_pins.items():
-    motors[motor_name] = Motor(board, pins['ena'], pins['in1'], pins['in2'])
+motor2_ena = 5
+motor2_in1 = 6
+motor2_in2 = 7
+
+motor3_ena = 9
+motor3_in1 = 8
+motor3_in2 = 10
+
+motor4_ena = 11
+motor4_in1 = 12
+motor4_in2 = 13
 
 # Pixel Values Settings
 pTime = 0
@@ -34,6 +59,11 @@ DISTANCE_ERROR_RANGE = [150, 250] # min, max
 DISTANCE_PWN_RANGE = 180
 
 PWM_SCALE = [0.50, 1.00]
+
+motor1 = Motor(board, motor1_ena, motor1_in1, motor1_in2)
+motor2 = Motor(board, motor2_ena, motor2_in1, motor2_in2)
+motor3 = Motor(board, motor3_ena, motor3_in1, motor3_in2)
+motor4 = Motor(board, motor4_ena, motor4_in1, motor4_in2)
 
 
 def RangeCalc(In, in_max, in_min, out_max, out_min):
