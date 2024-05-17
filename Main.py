@@ -22,6 +22,11 @@ class Motor:
         self.in2.write(1)
         self.ena.write(speed)
 
+    def stop(self):
+        self.in1.write(0)
+        self.in2.write(0)
+        self.ena.write(0)
+
 # OpenCV / Board Settings
 cap = cv2.VideoCapture(1)
 board = Arduino('COM5')
@@ -53,7 +58,6 @@ pTime = 0
 
 TURN_MIN_VALUE = 80
 TURN_MAX_VALUE = 220
-SERVO_MAX_TURN_ANGLE = 60
 
 DISTANCE_ERROR_RANGE = [150, 250] # min, max
 DISTANCE_PWN_RANGE = 180
