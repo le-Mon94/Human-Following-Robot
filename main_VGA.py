@@ -59,6 +59,7 @@ motor4_in2 = 13
 GPIO.setup(17, GPIO.OUT) # Red
 GPIO.setup(27, GPIO.OUT) # Yellow
 GPIO.setup(22, GPIO.OUT) # Green
+GPIO.setup(16, GPIO.OUT) # Buzzer
 
 # Pixel Values Settings
 pTime = 0
@@ -66,7 +67,7 @@ pTime = 0
 TURN_MIN_VALUE = 30
 TURN_MAX_VALUE = 160
 
-DISTANCE_MIN_VALUE = 60
+DISTANCE_MIN_VALUE = 30
 DISTANCE_MAX_VALUE = 120
 
 PWM_SCALE = [0.60, 1.00]
@@ -76,6 +77,14 @@ motor2 = Motor(board, motor2_ena, motor2_in1, motor2_in2)
 motor3 = Motor(board, motor3_ena, motor3_in1, motor3_in2)
 motor4 = Motor(board, motor4_ena, motor4_in1, motor4_in2)
 
+def Buzzer():
+    GPIO.output(16, GPIO.HIGH)
+    time.sleep(0.5)
+    GPIO.output(16, GPIO.LOW)
+    time.sleep(0.2)
+    GPIO.output(16, GPIO.HIGH)
+    time.sleep(0.5)
+    GPIO.output(16, GPIO.LOW)
 
 def RangeCalc(In, in_max, in_min, out_max, out_min):
     # mapped_value = (x_clipped - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
@@ -87,6 +96,8 @@ def RangeCalc(In, in_max, in_min, out_max, out_min):
     return mapped_value
 
 it.start()
+
+Buzzer()
 
 while True:
     
