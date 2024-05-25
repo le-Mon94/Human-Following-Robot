@@ -1,5 +1,4 @@
 from cvzone.FaceDetectionModule import FaceDetector
-from cvzone.HandTrackingModule import HandDetector
 from pyfirmata import Arduino, SERVO, PWM, OUTPUT, util
 
 import cv2
@@ -38,8 +37,7 @@ cap.set(cv2.CAP_PROP_FPS, 20)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-face_detector = FaceDetector(minDetectionCon=0.3, modelSelection=0)
-hand_detector = HandDetector(staticMode=False, maxHands=1, modelComplexity=1, detectionCon=0.5, minTrackCon=0.5)
+detector = FaceDetector(minDetectionCon=0.3, modelSelection=0)
 it = util.Iterator(board)
 
 motor1_ena = 3
@@ -73,14 +71,11 @@ DISTANCE_MAX_VALUE = 120
 
 PWM_SCALE = [0.60, 1.00]
 
-MODE = 'FaceDetect'
-
 motor1 = Motor(board, motor1_ena, motor1_in1, motor1_in2)
 motor2 = Motor(board, motor2_ena, motor2_in1, motor2_in2)
 motor3 = Motor(board, motor3_ena, motor3_in1, motor3_in2)
 motor4 = Motor(board, motor4_ena, motor4_in1, motor4_in2)
 
-it.start()
 
 def RangeCalc(In, in_max, in_min, out_max, out_min):
     # mapped_value = (x_clipped - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
@@ -90,6 +85,8 @@ def RangeCalc(In, in_max, in_min, out_max, out_min):
 
     mapped_value = round(mapped_value, 2)
     return mapped_value
+
+it.start()
 
 while True:
     
@@ -105,107 +102,94 @@ while True:
     img_center_y = height // 2
     img_center = [img_center_x, img_center_y]
 
-    if MODE == 'FaceDetect':
+    img, bboxs = detector.findFaces(img, draw=False)
 
-        img, bboxs = face_detector.findFaces(img, draw=False)
+    if bboxs:
+        
+        GPIO.output(22, GPIO.HIGH)
 
-        if bboxs:
+        bbox = bboxs[0]
+
+        center = bbox["center"]
+        x, y, w, h = bbox['bbox']
+        
+        turn_direc = img_center_x - center[0]
+        distance_scale = img_center_y - center[1]
+
+        # UI
+        cv2.circle(img, center, 5, (255, 0, 0), cv2.FILLED) # Bbox Center
+        cvzone.cornerRect(img, (x, y, w, h), 30, 3, 3, (255,0,255), (255,0,255)) # Bbox
+        cv2.line(img, center, (img_center_x, img_center_y), (255 ,0, 255), 2) # Line Bbox -> Center Img
+
+        cv2.putText(img, f"Distance :  {distance_scale}", (20, 180), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+        cv2.putText(img, f"Turn Offset Value :  {turn_direc}", (20, 80), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+
+        if abs(distance_scale) > DISTANCE_MIN_VALUE:
             
-            GPIO.output(22, GPIO.HIGH)
+            if distance_scale < 0: # DISTANCE = FAR
 
-            bbox = bboxs[0]
-
-            center = bbox["center"]
-            x, y, w, h = bbox['bbox']
-            
-            turn_direc = img_center_x - center[0]
-            distance_scale = img_center_y - center[1]
-
-            # UI
-            cv2.circle(img, center, 5, (255, 0, 0), cv2.FILLED) # Bbox Center
-            cvzone.cornerRect(img, (x, y, w, h), 30, 3, 3, (255,0,255), (255,0,255)) # Bbox
-            cv2.line(img, center, (img_center_x, img_center_y), (255 ,0, 255), 2) # Line Bbox -> Center Img
-
-            cv2.putText(img, f"Distance :  {distance_scale}", (20, 180), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-            cv2.putText(img, f"Turn Offset Value :  {turn_direc}", (20, 80), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-
-            if abs(distance_scale) > DISTANCE_MIN_VALUE:
+                cv2.putText(img, "Action : Far", (20, 200), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
                 
-                if distance_scale < 0: # DISTANCE = FAR
+                pwm = RangeCalc(abs(distance_scale), DISTANCE_MAX_VALUE, DISTANCE_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
+                cv2.putText(img, f"PWM :  {pwm}", (20, 220), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
+                
+                motor1.forward(pwm)
+                motor2.forward(pwm)
+                motor3.forward(pwm)
+                motor4.forward(pwm)
+                
+            else: # DISTANCE = NEAR
 
-                    cv2.putText(img, "Action : Far", (20, 200), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-                    
-                    pwm = RangeCalc(abs(distance_scale), DISTANCE_MAX_VALUE, DISTANCE_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
-                    cv2.putText(img, f"PWM :  {pwm}", (20, 220), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
-                    
+                cv2.putText(img, "Action : Near", (20, 200), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+
+                pwm = RangeCalc(abs(distance_scale), DISTANCE_MAX_VALUE, DISTANCE_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
+                cv2.putText(img, f"PWM :  {pwm}", (20, 220), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
+                
+                motor1.backward(pwm)
+                motor2.backward(pwm)
+                motor3.backward(pwm)
+                motor4.backward(pwm)
+
+        else: # MOTOR TURNING / DISTANCE = OPTIMAL
+
+            if abs(turn_direc) > TURN_MIN_VALUE:
+
+                if turn_direc < 0:
+                    cv2.putText(img, "Turn Direction : Right", (20, 100), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
+
+                    pwm = RangeCalc(abs(turn_direc), TURN_MAX_VALUE, TURN_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
+                    cv2.putText(img, f"PWM :  {pwm}", (20, 120), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
+
                     motor1.forward(pwm)
-                    motor2.forward(pwm)
+                    motor2.backward(pwm)
                     motor3.forward(pwm)
-                    motor4.forward(pwm)
-                    
-                else: # DISTANCE = NEAR
+                    motor4.backward(pwm)
+                
+                else:
+                    cv2.putText(img, "Turn Direction : Left", (20, 100), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
 
-                    cv2.putText(img, "Action : Near", (20, 200), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-
-                    pwm = RangeCalc(abs(distance_scale), DISTANCE_MAX_VALUE, DISTANCE_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
-                    cv2.putText(img, f"PWM :  {pwm}", (20, 220), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
+                    pwm = RangeCalc(abs(turn_direc), TURN_MAX_VALUE, TURN_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
+                    cv2.putText(img, f"PWM :  {pwm}", (20, 120), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
                     
                     motor1.backward(pwm)
-                    motor2.backward(pwm)
+                    motor2.forward(pwm)
                     motor3.backward(pwm)
-                    motor4.backward(pwm)
-
-            else: # MOTOR TURNING / DISTANCE = OPTIMAL
-
-                if abs(turn_direc) > TURN_MIN_VALUE:
-
-                    if turn_direc < 0:
-                        cv2.putText(img, "Turn Direction : Right", (20, 100), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-
-                        pwm = RangeCalc(abs(turn_direc), TURN_MAX_VALUE, TURN_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
-                        cv2.putText(img, f"PWM :  {pwm}", (20, 120), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
-
-                        motor1.forward(pwm)
-                        motor2.backward(pwm)
-                        motor3.forward(pwm)
-                        motor4.backward(pwm)
-                    
-                    else:
-                        cv2.putText(img, "Turn Direction : Left", (20, 100), cv2.FONT_HERSHEY_PLAIN, 1, (0, 255, 0), 2)
-
-                        pwm = RangeCalc(abs(turn_direc), TURN_MAX_VALUE, TURN_MIN_VALUE, PWM_SCALE[1], PWM_SCALE[0])
-                        cv2.putText(img, f"PWM :  {pwm}", (20, 120), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 255), 2)
+                    motor4.forward(pwm)
+            else:
                         
-                        motor1.backward(pwm)
-                        motor2.forward(pwm)
-                        motor3.backward(pwm)
-                        motor4.forward(pwm)
-                else:
-                            
-                    motor1.stop()
-                    motor2.stop()
-                    motor3.stop()
-                    motor4.stop()
-        else:
-            
-            GPIO.output(22, GPIO.LOW)
-            motor1.stop()
-            motor2.stop()
-            motor3.stop()
-            motor4.stop()
+                motor1.stop()
+                motor2.stop()
+                motor3.stop()
+                motor4.stop()
+    else:
+        
+        GPIO.output(22, GPIO.LOW)
+        motor1.stop()
+        motor2.stop()
+        motor3.stop()
+        motor4.stop()
 
-    elif MODE == 'HandDetect':
-
-        hands, img = hand_detector.findHands(img, draw=True, flipType=True)
-
-        if hands:
-
-            hand = hands[0] 
-            lmList = hand["lmList"] 
-            bbox = hand["bbox"]
-            center = hand['center']
-            handType = hand["type"]
-
+    
     cv2.putText(img, f'FPS : {int(fps)}', (20, 40), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 2) # FPS
     cv2.circle(img, (img_center_x, img_center_y), 5, (255, 0, 0), cv2.FILLED) # Middle Circle
     cv2.line(img, (0, img_center_y), (width, img_center_y), (0, 255, 0), 1)  # Horizontal line
