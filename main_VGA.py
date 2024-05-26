@@ -96,7 +96,6 @@ def RangeCalc(In, in_max, in_min, out_max, out_min):
     return mapped_value
 
 it.start()
-
 Buzzer()
 
 while True:
